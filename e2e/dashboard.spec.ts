@@ -215,16 +215,18 @@ test.describe('Dashboard Builder', () => {
       await page.getByTestId('add-widget-btn').click()
       await page.getByTestId('widget-type-burndown').click()
 
+      const dialog = page.getByRole('dialog')
+
       // Switch to status mode
-      await page.getByText('Date-based (Planned / Actual / Forecast)').click()
+      await dialog.getByText('Date-based (Planned / Actual / Forecast)').click()
       await page.getByRole('option', { name: /Status-based/ }).click()
 
       // Status fields should now be visible
-      await expect(page.getByText('Status Column')).toBeVisible()
-      await expect(page.getByText('Completed Status Value')).toBeVisible()
+      await expect(dialog.getByText('Status Column', { exact: true })).toBeVisible()
+      await expect(dialog.getByText('Completed Status Value')).toBeVisible()
 
       // Date-based fields should NOT be visible
-      await expect(page.getByText('Planned Date Column')).not.toBeVisible()
+      await expect(dialog.getByText('Planned Date Column')).not.toBeVisible()
     })
 
     test('burndown shows value column selector', async ({ page }) => {
@@ -266,8 +268,10 @@ test.describe('Dashboard Builder', () => {
       await page.getByTestId('add-widget-btn').click()
       await page.getByTestId('widget-type-pie').click()
 
-      // Open the Value Column dropdown
-      await page.getByText('Value Column').click()
+      const dialog = page.getByRole('dialog')
+
+      // Open the Value Column dropdown — find the select trigger after the "Value Column" label
+      await dialog.getByText('Value Column', { exact: true }).locator('..').locator('button[role="combobox"]').click()
       const dropdown = page.locator('[role="listbox"]')
 
       // Should show non-key number columns
