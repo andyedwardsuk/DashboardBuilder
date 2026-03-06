@@ -173,5 +173,110 @@ test.describe('Dashboard Builder', () => {
       await page.getByRole('button', { name: /Settings/ }).click()
       await expect(page).toHaveURL(/\/setup/)
     })
+
+    test('line chart shows S-curve mode option', async ({ page }) => {
+      await page.getByTestId('add-widget-btn').click()
+      await page.getByTestId('widget-type-line').click()
+
+      // Should see Chart Mode selector
+      await expect(page.getByText('Chart Mode')).toBeVisible()
+
+      // Switch to S-Curve mode
+      await page.getByText('Standard').click()
+      await page.getByRole('option', { name: /S-Curve/ }).click()
+
+      // Should show S-curve specific options
+      await expect(page.getByText('Planned Date Column')).toBeVisible()
+      await expect(page.getByText('Actual Date Column')).toBeVisible()
+      await expect(page.getByText('Forecast Date Column')).toBeVisible()
+      await expect(page.getByText('Date Aggregation')).toBeVisible()
+      await expect(page.getByText('Display Mode')).toBeVisible()
+
+      // Group-by should NOT be visible in S-curve mode
+      await expect(page.getByText('Group By Column')).not.toBeVisible()
+    })
+
+    test('burndown shows date-based mode by default', async ({ page }) => {
+      await page.getByTestId('add-widget-btn').click()
+      await page.getByTestId('widget-type-burndown').click()
+
+      // Should see Burndown Mode selector defaulting to date-based
+      await expect(page.getByText('Burndown Mode')).toBeVisible()
+      await expect(page.getByText('Planned Date Column')).toBeVisible()
+      await expect(page.getByText('Actual Date Column')).toBeVisible()
+      await expect(page.getByText('Forecast Date Column')).toBeVisible()
+
+      // Status-based fields should NOT be visible
+      await expect(page.getByText('Status Column')).not.toBeVisible()
+      await expect(page.getByText('Completed Status Value')).not.toBeVisible()
+    })
+
+    test('burndown can switch to legacy status mode', async ({ page }) => {
+      await page.getByTestId('add-widget-btn').click()
+      await page.getByTestId('widget-type-burndown').click()
+
+      // Switch to status mode
+      await page.getByText('Date-based (Planned / Actual / Forecast)').click()
+      await page.getByRole('option', { name: /Status-based/ }).click()
+
+      // Status fields should now be visible
+      await expect(page.getByText('Status Column')).toBeVisible()
+      await expect(page.getByText('Completed Status Value')).toBeVisible()
+
+      // Date-based fields should NOT be visible
+      await expect(page.getByText('Planned Date Column')).not.toBeVisible()
+    })
+
+    test('burndown shows value column selector', async ({ page }) => {
+      await page.getByTestId('add-widget-btn').click()
+      await page.getByTestId('widget-type-burndown').click()
+
+      // Value Column should be visible for burndown
+      await expect(page.getByText('Value Column')).toBeVisible()
+    })
+  })
+
+  test.describe('Setup Page - Clear All Options', () => {
+    test('can clear all options from a select/multi-select column', async ({ page }) => {
+      await page.getByTestId('load-sample').click()
+
+      // Populate options for Status column
+      await page.getByTestId('populate-options-Status').click()
+
+      // Verify options are populated (should have badges)
+      await expect(page.getByTestId('remove-all-options-Status')).toBeVisible()
+
+      // Click Remove all
+      await page.getByTestId('remove-all-options-Status').click()
+
+      // Remove all button should disappear (no options left)
+      await expect(page.getByTestId('remove-all-options-Status')).not.toBeVisible()
+
+      // Should show "No options defined" message
+      const statusRow = page.getByTestId('column-row-Status')
+      await expect(statusRow.getByText('No options defined')).toBeVisible()
+    })
+  })
+
+  test.describe('Value Column Detection', () => {
+    test('value column dropdown excludes the key column', async ({ page }) => {
+      await page.getByTestId('load-sample').click()
+      await page.getByTestId('proceed-dashboard').click()
+
+      await page.getByTestId('add-widget-btn').click()
+      await page.getByTestId('widget-type-pie').click()
+
+      // Open the Value Column dropdown
+      await page.getByText('Value Column').click()
+      const dropdown = page.locator('[role="listbox"]')
+
+      // Should show non-key number columns
+      await expect(dropdown.getByRole('option', { name: 'Estimated Hours' })).toBeVisible()
+      await expect(dropdown.getByRole('option', { name: 'Actual Hours' })).toBeVisible()
+      await expect(dropdown.getByRole('option', { name: 'Rework Hours' })).toBeVisible()
+
+      // ID (key column) should NOT be in the list
+      await expect(dropdown.getByRole('option', { name: 'ID' })).not.toBeVisible()
+    })
   })
 })
