@@ -5,9 +5,10 @@ import type { WidgetConfig } from '@/types'
 interface Props {
   config: WidgetConfig
   rows: Record<string, unknown>[]
+  accentColor?: string
 }
 
-export default function BurnDownWidget({ config, rows }: Props) {
+export default function BurnDownWidget({ config, rows, accentColor }: Props) {
   const data = useMemo(() => {
     const { dateColumn, statusColumn, completedValue = 'Done', valueColumn } = config
     if (!dateColumn || !statusColumn) return []
@@ -69,7 +70,7 @@ export default function BurnDownWidget({ config, rows }: Props) {
         <YAxis tick={{ fontSize: 11 }} />
         <Tooltip />
         <Legend />
-        <Area type="monotone" dataKey="remaining" stroke="#FF8042" fill="#FF8042" fillOpacity={0.3} name="Remaining" />
+        <Area type="monotone" dataKey="remaining" stroke={accentColor ?? '#FF8042'} fill={accentColor ?? '#FF8042'} fillOpacity={0.3} name="Remaining" />
         <Area type="monotone" dataKey="ideal" stroke="#82ca9d" fill="none" strokeDasharray="5 5" name="Ideal" />
       </AreaChart>
     </ResponsiveContainer>

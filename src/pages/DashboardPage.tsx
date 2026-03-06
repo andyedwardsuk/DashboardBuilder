@@ -2,16 +2,38 @@ import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Responsive, useContainerWidth } from 'react-grid-layout'
 import { useData } from '@/context/DataContext'
-import type { WidgetType, WidgetConfig, Widget } from '@/types'
+import type { WidgetType, WidgetConfig, Widget, AccentColor } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu'
 import AddWidgetDialog from '@/components/AddWidgetDialog'
 import PieChartWidget from '@/components/widgets/PieChartWidget'
 import LineChartWidget from '@/components/widgets/LineChartWidget'
 import BurnDownWidget from '@/components/widgets/BurnDownWidget'
 import IndicatorWidget from '@/components/widgets/IndicatorWidget'
 import FreeTextWidget from '@/components/widgets/FreeTextWidget'
-import { Plus, Settings, Trash2, GripVertical } from 'lucide-react'
+import { Plus, Settings, GripVertical, MoreVertical, Pencil, Trash2 } from 'lucide-react'
+
+const ACCENT_HEX: Record<AccentColor, string> = {
+  blue: '#3b82f6',
+  green: '#22c55e',
+  red: '#ef4444',
+  orange: '#f97316',
+  purple: '#a855f7',
+  grey: '#6b7280',
+}
+
+const TITLE_SIZE_CLASS: Record<string, string> = {
+  small: 'text-xs',
+  medium: 'text-sm',
+  large: 'text-base',
+}
 
 
 interface GridContainerProps {
@@ -19,10 +41,11 @@ interface GridContainerProps {
   handleLayoutChange: (layout: ReadonlyArray<{ readonly i: string; readonly x: number; readonly y: number; readonly w: number; readonly h: number }>) => void
   widgets: Widget[]
   handleRemoveWidget: (id: string) => void
+  handleEditWidget: (widget: Widget) => void
   renderWidget: (widget: Widget) => React.ReactNode
 }
 
-function GridContainer({ gridLayouts, handleLayoutChange, widgets, handleRemoveWidget, renderWidget }: GridContainerProps) {
+function GridContainer({ gridLayouts, handleLayoutChange, widgets, handleRemoveWidget, handleEditWidget, renderWidget }: GridContainerProps) {
   const { width: containerWidth, containerRef, mounted } = useContainerWidth()
 
   return (
@@ -39,30 +62,60 @@ function GridContainer({ gridLayouts, handleLayoutChange, widgets, handleRemoveW
           dragConfig={{ enabled: true, bounded: false, handle: '.drag-handle', threshold: 3 }}
           resizeConfig={{ enabled: true, handles: ['se'] }}
         >
-          {widgets.map((widget) => (
-            <div key={widget.id} data-testid={`widget-${widget.id}`}>
-              <Card className="h-full flex flex-col overflow-hidden">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 py-2 px-3">
-                  <div className="flex items-center gap-2">
-                    <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab drag-handle" />
-                    <CardTitle className="text-sm font-medium">{widget.title}</CardTitle>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={() => handleRemoveWidget(widget.id)}
-                    data-testid={`remove-widget-${widget.id}`}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </CardHeader>
-                <CardContent className="flex-1 p-2 min-h-0">
-                  {renderWidget(widget)}
-                </CardContent>
-              </Card>
-            </div>
-          ))}
+          {widgets.map((widget) => {
+            const appearance = widget.config.appearance ?? {}
+            const showTitle = appearance.showTitle !== false
+            const titleSizeClass = TITLE_SIZE_CLASS[appearance.titleFontSize ?? 'medium'] ?? 'text-sm'
+            const accentColor = appearance.accentColor ?? 'blue'
+            const accentHex = ACCENT_HEX[accentColor]
+
+            return (
+              <div key={widget.id} data-testid={`widget-${widget.id}`}>
+                <Card
+                  className="h-full flex flex-col overflow-hidden"
+                  style={{ borderTopColor: accentHex, borderTopWidth: '3px' }}
+                >
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 py-2 px-3">
+                    <div className="flex items-center gap-2">
+                      <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab drag-handle" />
+                      {showTitle && (
+                        <CardTitle className={`${titleSizeClass} font-medium`}>{widget.title}</CardTitle>
+                      )}
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          data-testid={`widget-menu-${widget.id}`}
+                        >
+                          <MoreVertical className="h-3 w-3" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleEditWidget(widget)}>
+                          <Pencil className="mr-2 h-3.5 w-3.5" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => handleRemoveWidget(widget.id)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="mr-2 h-3.5 w-3.5" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </CardHeader>
+                  <CardContent className="flex-1 p-2 min-h-0">
+                    {renderWidget(widget)}
+                  </CardContent>
+                </Card>
+              </div>
+            )
+          })}
         </Responsive>
       )}
     </div>
@@ -79,10 +132,24 @@ export default function DashboardPage() {
   const { state, dispatch } = useData()
   const navigate = useNavigate()
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [editingWidget, setEditingWidget] = useState<Widget | null>(null)
 
   const columns = state.dataSet?.columns ?? []
   const rows = state.dataSet?.rows ?? []
   const widgets = state.widgets
+
+  const handleLayoutChange = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (layout: any) => {
+      const items = layout as Array<{ i: string; x: number; y: number; w: number; h: number }>
+      const updates = items.map((l) => ({
+        id: l.i,
+        layout: { x: l.x, y: l.y, w: l.w, h: l.h },
+      }))
+      dispatch({ type: 'UPDATE_LAYOUTS', payload: updates })
+    },
+    [dispatch]
+  )
 
   if (!state.dataSet) {
     return (
@@ -121,18 +188,14 @@ export default function DashboardPage() {
     dispatch({ type: 'REMOVE_WIDGET', payload: id })
   }
 
-  const handleLayoutChange = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (layout: any) => {
-      const items = layout as Array<{ i: string; x: number; y: number; w: number; h: number }>
-      const updates = items.map((l) => ({
-        id: l.i,
-        layout: { x: l.x, y: l.y, w: l.w, h: l.h },
-      }))
-      dispatch({ type: 'UPDATE_LAYOUTS', payload: updates })
-    },
-    [dispatch]
-  )
+  function handleEditWidget(widget: Widget) {
+    setEditingWidget(widget)
+  }
+
+  function handleEditSubmit(updated: Widget) {
+    dispatch({ type: 'UPDATE_WIDGET', payload: updated })
+    setEditingWidget(null)
+  }
 
   const gridLayouts = {
     lg: widgets.map((w) => ({
@@ -147,15 +210,16 @@ export default function DashboardPage() {
   }
 
   function renderWidget(widget: Widget) {
+    const accentHex = ACCENT_HEX[widget.config.appearance?.accentColor ?? 'blue']
     switch (widget.type) {
       case 'pie':
-        return <PieChartWidget config={widget.config} rows={rows} />
+        return <PieChartWidget config={widget.config} rows={rows} accentColor={accentHex} />
       case 'line':
-        return <LineChartWidget config={widget.config} rows={rows} />
+        return <LineChartWidget config={widget.config} rows={rows} accentColor={accentHex} />
       case 'burndown':
-        return <BurnDownWidget config={widget.config} rows={rows} />
+        return <BurnDownWidget config={widget.config} rows={rows} accentColor={accentHex} />
       case 'indicator':
-        return <IndicatorWidget config={widget.config} rows={rows} />
+        return <IndicatorWidget config={widget.config} rows={rows} accentColor={accentHex} />
       case 'freetext':
         return <FreeTextWidget config={widget.config} />
       default:
@@ -202,6 +266,7 @@ export default function DashboardPage() {
             handleLayoutChange={handleLayoutChange}
             widgets={widgets}
             handleRemoveWidget={handleRemoveWidget}
+            handleEditWidget={handleEditWidget}
             renderWidget={renderWidget}
           />
         )}
@@ -212,6 +277,16 @@ export default function DashboardPage() {
         onOpenChange={setDialogOpen}
         columns={columns}
         onAdd={handleAddWidget}
+      />
+
+      {/* Edit widget dialog */}
+      <AddWidgetDialog
+        open={!!editingWidget}
+        onOpenChange={(open) => { if (!open) setEditingWidget(null) }}
+        columns={columns}
+        onAdd={handleAddWidget}
+        editWidget={editingWidget}
+        onEdit={handleEditSubmit}
       />
     </div>
   )

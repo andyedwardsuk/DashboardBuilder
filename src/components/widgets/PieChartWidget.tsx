@@ -2,14 +2,21 @@ import { useMemo } from 'react'
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import type { WidgetConfig } from '@/types'
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#ff7300']
+const DEFAULT_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#ff7300']
+
+/** Generate a palette seeded from the accent colour */
+function buildPalette(accent: string): string[] {
+  return [accent, ...DEFAULT_COLORS.filter((c) => c !== accent)]
+}
 
 interface Props {
   config: WidgetConfig
   rows: Record<string, unknown>[]
+  accentColor?: string
 }
 
-export default function PieChartWidget({ config, rows }: Props) {
+export default function PieChartWidget({ config, rows, accentColor }: Props) {
+  const COLORS = accentColor ? buildPalette(accentColor) : DEFAULT_COLORS
   const data = useMemo(() => {
     const { groupByColumn, valueColumn, aggregation = 'count' } = config
     if (!groupByColumn) return []

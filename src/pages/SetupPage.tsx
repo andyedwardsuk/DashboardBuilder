@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useData } from '@/context/DataContext'
 import { sampleColumns, sampleRows } from '@/data/fakeData'
 import type { ColumnConfig, ColumnType } from '@/types'
+import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -15,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Upload, Database, ArrowRight, Check } from 'lucide-react'
+import { Upload, Database, ArrowRight, Check, X, Sparkles } from 'lucide-react'
 
 const COLUMN_TYPES: { value: ColumnType; label: string }[] = [
   { value: 'text', label: 'Text' },
@@ -23,6 +24,7 @@ const COLUMN_TYPES: { value: ColumnType; label: string }[] = [
   { value: 'free-text', label: 'Free Text' },
   { value: 'number', label: 'Number' },
   { value: 'date', label: 'Date' },
+  { value: 'select', label: 'Select' },
   { value: 'multi-select', label: 'Multi-Select' },
 ]
 
@@ -89,9 +91,55 @@ export default function SetupPage() {
     }
   }
 
+  const [optionInputs, setOptionInputs] = useState<Record<string, string>>({})
+
   function handleColumnTypeChange(colName: string, newType: ColumnType) {
     const updated = columns.map((c) =>
       c.name === colName ? { ...c, type: newType } : c
+    )
+    dispatch({ type: 'UPDATE_COLUMNS', payload: updated })
+  }
+
+  function handleAddOption(colName: string) {
+    const value = (optionInputs[colName] ?? '').trim()
+    if (!value) return
+    const updated = columns.map((c) => {
+      if (c.name !== colName) return c
+      const existing = c.options ?? []
+      if (existing.includes(value)) return c
+      return { ...c, options: [...existing, value] }
+    })
+    dispatch({ type: 'UPDATE_COLUMNS', payload: updated })
+    setOptionInputs((prev) => ({ ...prev, [colName]: '' }))
+  }
+
+  function handleRemoveOption(colName: string, option: string) {
+    const updated = columns.map((c) => {
+      if (c.name !== colName) return c
+      return { ...c, options: (c.options ?? []).filter((o) => o !== option) }
+    })
+    dispatch({ type: 'UPDATE_COLUMNS', payload: updated })
+  }
+
+  function handlePopulateFromData(colName: string) {
+    const unique = new Set<string>()
+    for (const row of rows) {
+      const val = row[colName]
+      if (val != null && String(val).trim()) {
+        // For multi-select, values might be comma-separated
+        const col = columns.find((c) => c.name === colName)
+        if (col?.type === 'multi-select') {
+          String(val).split(',').forEach((v) => {
+            const trimmed = v.trim()
+            if (trimmed) unique.add(trimmed)
+          })
+        } else {
+          unique.add(String(val).trim())
+        }
+      }
+    }
+    const updated = columns.map((c) =>
+      c.name === colName ? { ...c, options: [...unique].sort() } : c
     )
     dispatch({ type: 'UPDATE_COLUMNS', payload: updated })
   }
@@ -200,43 +248,105 @@ export default function SetupPage() {
                   {columns.map((col) => (
                     <div
                       key={col.name}
-                      className="grid grid-cols-[1fr_200px_100px] gap-4 items-center"
+                      className="space-y-2"
                       data-testid={`column-row-${col.name}`}
                     >
-                      <div className="flex items-center gap-2">
-                        <Label className="font-medium">{col.name}</Label>
-                        {rows.length > 0 && (
-                          <span className="text-xs text-muted-foreground">
-                            e.g. {String(rows[0][col.name] ?? '').substring(0, 40)}
-                          </span>
-                        )}
+                      <div className="grid grid-cols-[1fr_200px_100px] gap-4 items-center">
+                        <div className="flex items-center gap-2">
+                          <Label className="font-medium">{col.name}</Label>
+                          {rows.length > 0 && (
+                            <span className="text-xs text-muted-foreground">
+                              e.g. {String(rows[0][col.name] ?? '').substring(0, 40)}
+                            </span>
+                          )}
+                        </div>
+                        <Select
+                          value={col.type}
+                          onValueChange={(val) =>
+                            handleColumnTypeChange(col.name, val as ColumnType)
+                          }
+                        >
+                          <SelectTrigger data-testid={`type-select-${col.name}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {COLUMN_TYPES.map((ct) => (
+                              <SelectItem key={ct.value} value={ct.value}>
+                                {ct.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant={col.isKey ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => handleKeyChange(col.name)}
+                          data-testid={`key-btn-${col.name}`}
+                        >
+                          {col.isKey && <Check className="mr-1 h-3 w-3" />}
+                          {col.isKey ? 'Key' : 'Set Key'}
+                        </Button>
                       </div>
-                      <Select
-                        value={col.type}
-                        onValueChange={(val) =>
-                          handleColumnTypeChange(col.name, val as ColumnType)
-                        }
-                      >
-                        <SelectTrigger data-testid={`type-select-${col.name}`}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {COLUMN_TYPES.map((ct) => (
-                            <SelectItem key={ct.value} value={ct.value}>
-                              {ct.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        variant={col.isKey ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => handleKeyChange(col.name)}
-                        data-testid={`key-btn-${col.name}`}
-                      >
-                        {col.isKey && <Check className="mr-1 h-3 w-3" />}
-                        {col.isKey ? 'Key' : 'Set Key'}
-                      </Button>
+
+                      {(col.type === 'select' || col.type === 'multi-select') && (
+                        <div className="ml-4 pl-4 border-l-2 border-muted space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Input
+                              value={optionInputs[col.name] ?? ''}
+                              onChange={(e) =>
+                                setOptionInputs((prev) => ({ ...prev, [col.name]: e.target.value }))
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault()
+                                  handleAddOption(col.name)
+                                }
+                              }}
+                              placeholder="Type an option and press Enter"
+                              className="h-8 text-sm max-w-[250px]"
+                              data-testid={`option-input-${col.name}`}
+                            />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 text-xs"
+                              onClick={() => handleAddOption(col.name)}
+                            >
+                              Add
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 text-xs"
+                              onClick={() => handlePopulateFromData(col.name)}
+                              data-testid={`populate-options-${col.name}`}
+                            >
+                              <Sparkles className="mr-1 h-3 w-3" />
+                              Use Source Data
+                            </Button>
+                          </div>
+                          {(col.options ?? []).length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {col.options!.map((opt) => (
+                                <Badge key={opt} variant="secondary" className="text-xs gap-1">
+                                  {opt}
+                                  <button
+                                    onClick={() => handleRemoveOption(col.name, opt)}
+                                    className="ml-0.5 hover:text-destructive"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                          {(col.options ?? []).length === 0 && (
+                            <p className="text-xs text-muted-foreground">
+                              No options defined. Add manually or populate from data.
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

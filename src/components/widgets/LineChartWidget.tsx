@@ -5,9 +5,10 @@ import type { WidgetConfig } from '@/types'
 interface Props {
   config: WidgetConfig
   rows: Record<string, unknown>[]
+  accentColor?: string
 }
 
-export default function LineChartWidget({ config, rows }: Props) {
+export default function LineChartWidget({ config, rows, accentColor }: Props) {
   const data = useMemo(() => {
     const { groupByColumn, valueColumn, aggregation = 'count' } = config
     if (!groupByColumn) return []
@@ -46,7 +47,7 @@ export default function LineChartWidget({ config, rows }: Props) {
         <YAxis tick={{ fontSize: 11 }} />
         <Tooltip />
         <Legend />
-        <Line type="monotone" dataKey="value" stroke="#0088FE" strokeWidth={2} dot={{ r: 3 }} />
+        <Line type="monotone" dataKey="value" stroke={accentColor ?? '#0088FE'} strokeWidth={2} dot={{ r: 3 }} />
       </LineChart>
     </ResponsiveContainer>
   )

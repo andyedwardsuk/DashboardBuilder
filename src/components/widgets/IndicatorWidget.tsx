@@ -4,9 +4,10 @@ import type { WidgetConfig } from '@/types'
 interface Props {
   config: WidgetConfig
   rows: Record<string, unknown>[]
+  accentColor?: string
 }
 
-export default function IndicatorWidget({ config, rows }: Props) {
+export default function IndicatorWidget({ config, rows, accentColor }: Props) {
   const { value, label, percentage } = useMemo(() => {
     const { valueColumn, aggregation = 'count', groupByColumn, targetValue } = config
 
@@ -55,7 +56,11 @@ export default function IndicatorWidget({ config, rows }: Props) {
 
   return (
     <div className="flex flex-col items-center justify-center h-full gap-2 p-4">
-      <span className={`text-4xl font-bold ${color}`} data-testid="indicator-value">
+      <span
+        className={`text-4xl font-bold ${color}`}
+        style={percentage === null && accentColor ? { color: accentColor } : undefined}
+        data-testid="indicator-value"
+      >
         {typeof value === 'number' && value % 1 !== 0 ? value.toFixed(1) : value}
       </span>
       <span className="text-sm text-muted-foreground text-center">{label}</span>
