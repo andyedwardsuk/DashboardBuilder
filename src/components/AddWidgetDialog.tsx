@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { WidgetType, WidgetConfig, ColumnConfig, Widget, AccentColor, TitleFontSize } from '@/types'
+import type { WidgetType, WidgetConfig, ColumnConfig, Widget, AccentColor, TitleFontSize, LineChartMode, DateAggregation, DisplayMode, BurndownMode } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -95,7 +95,7 @@ function AddWidgetDialogInner({ open, onOpenChange, columns, onAdd, editWidget, 
     onOpenChange(false)
   }
 
-  const numberColumns = columns.filter((c) => c.type === 'number')
+  const numberColumns = columns.filter((c) => c.type === 'number' && !c.isKey)
   const dateColumns = columns.filter((c) => c.type === 'date')
   const categoricalColumns = columns.filter((c) =>
     ['select', 'multi-select', 'short-text', 'text'].includes(c.type)
@@ -109,7 +109,7 @@ function AddWidgetDialogInner({ open, onOpenChange, columns, onAdd, editWidget, 
     }))
   }
 
-  const showValueColumn = selectedType === 'pie' || selectedType === 'line' || selectedType === 'indicator'
+  const showValueColumn = selectedType === 'pie' || selectedType === 'line' || selectedType === 'indicator' || selectedType === 'burndown'
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) handleCancel(); else onOpenChange(o) }}>
@@ -156,7 +156,25 @@ function AddWidgetDialogInner({ open, onOpenChange, columns, onAdd, editWidget, 
               />
             </div>
 
-            {(selectedType === 'pie' || selectedType === 'line') && (
+            {selectedType === 'line' && (
+              <div className="space-y-2">
+                <Label>Chart Mode</Label>
+                <Select
+                  value={config.chartMode ?? 'standard'}
+                  onValueChange={(v) => setConfig({ ...config, chartMode: v as LineChartMode })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="standard">Standard</SelectItem>
+                    <SelectItem value="scurve">S-Curve (Planned / Actual / Forecast)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {(selectedType === 'pie' || (selectedType === 'line' && (config.chartMode ?? 'standard') === 'standard')) && (
               <>
                 <div className="space-y-2">
                   <Label>Group By Column</Label>
@@ -187,6 +205,91 @@ function AddWidgetDialogInner({ open, onOpenChange, columns, onAdd, editWidget, 
                       <SelectItem value="count">Count</SelectItem>
                       <SelectItem value="sum">Sum</SelectItem>
                       <SelectItem value="average">Average</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+
+            {/* S-curve date columns and options */}
+            {selectedType === 'line' && config.chartMode === 'scurve' && (
+              <>
+                <div className="space-y-2">
+                  <Label>Planned Date Column</Label>
+                  <Select
+                    value={config.plannedDateColumn ?? ''}
+                    onValueChange={(v) => setConfig({ ...config, plannedDateColumn: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select date column..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {dateColumns.map((c) => (
+                        <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Actual Date Column</Label>
+                  <Select
+                    value={config.actualDateColumn ?? ''}
+                    onValueChange={(v) => setConfig({ ...config, actualDateColumn: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select date column..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {dateColumns.map((c) => (
+                        <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Forecast Date Column</Label>
+                  <Select
+                    value={config.forecastDateColumn ?? ''}
+                    onValueChange={(v) => setConfig({ ...config, forecastDateColumn: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select date column..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {dateColumns.map((c) => (
+                        <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Date Aggregation</Label>
+                  <Select
+                    value={config.dateAggregation ?? 'week'}
+                    onValueChange={(v) => setConfig({ ...config, dateAggregation: v as DateAggregation })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="day">Day</SelectItem>
+                      <SelectItem value="week">Week</SelectItem>
+                      <SelectItem value="month">Month</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Display Mode</Label>
+                  <Select
+                    value={config.displayMode ?? 'accumulated'}
+                    onValueChange={(v) => setConfig({ ...config, displayMode: v as DisplayMode })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="accumulated">Accumulated Total</SelectItem>
+                      <SelectItem value="remaining">Remaining Value</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -229,11 +332,15 @@ function AddWidgetDialogInner({ open, onOpenChange, columns, onAdd, editWidget, 
                     ))}
                   </SelectContent>
                 </Select>
-                {(config.aggregation ?? 'count') === 'count' && (
+                {selectedType === 'burndown' ? (
+                  <p className="text-xs text-muted-foreground">
+                    Optional. When set, uses the numeric value per row instead of counting rows.
+                  </p>
+                ) : (config.aggregation ?? 'count') === 'count' ? (
                   <p className="text-xs text-muted-foreground">
                     Value column is ignored when aggregation is Count.
                   </p>
-                )}
+                ) : null}
               </div>
             )}
 
@@ -252,45 +359,118 @@ function AddWidgetDialogInner({ open, onOpenChange, columns, onAdd, editWidget, 
             {selectedType === 'burndown' && (
               <>
                 <div className="space-y-2">
-                  <Label>Date Column</Label>
+                  <Label>Burndown Mode</Label>
                   <Select
-                    value={config.dateColumn ?? ''}
-                    onValueChange={(v) => setConfig({ ...config, dateColumn: v })}
+                    value={config.burndownMode ?? 'dates'}
+                    onValueChange={(v) => setConfig({ ...config, burndownMode: v as BurndownMode })}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select date column..." />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {dateColumns.map((c) => (
-                        <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>
-                      ))}
+                      <SelectItem value="dates">Date-based (Planned / Actual / Forecast)</SelectItem>
+                      <SelectItem value="status">Status-based (legacy)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label>Status Column</Label>
-                  <Select
-                    value={config.statusColumn ?? ''}
-                    onValueChange={(v) => setConfig({ ...config, statusColumn: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select status column..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categoricalColumns.map((c) => (
-                        <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Completed Status Value</Label>
-                  <Input
-                    value={config.completedValue ?? 'Done'}
-                    onChange={(e) => setConfig({ ...config, completedValue: e.target.value })}
-                    placeholder="e.g. Done"
-                  />
-                </div>
+
+                {(config.burndownMode ?? 'dates') === 'dates' && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Planned Date Column</Label>
+                      <Select
+                        value={config.plannedDateColumn ?? ''}
+                        onValueChange={(v) => setConfig({ ...config, plannedDateColumn: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select date column..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {dateColumns.map((c) => (
+                            <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Actual Date Column</Label>
+                      <Select
+                        value={config.actualDateColumn ?? ''}
+                        onValueChange={(v) => setConfig({ ...config, actualDateColumn: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select date column..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {dateColumns.map((c) => (
+                            <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Forecast Date Column</Label>
+                      <Select
+                        value={config.forecastDateColumn ?? ''}
+                        onValueChange={(v) => setConfig({ ...config, forecastDateColumn: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select date column..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {dateColumns.map((c) => (
+                            <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
+
+                {config.burndownMode === 'status' && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Date Column</Label>
+                      <Select
+                        value={config.dateColumn ?? ''}
+                        onValueChange={(v) => setConfig({ ...config, dateColumn: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select date column..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {dateColumns.map((c) => (
+                            <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Status Column</Label>
+                      <Select
+                        value={config.statusColumn ?? ''}
+                        onValueChange={(v) => setConfig({ ...config, statusColumn: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select status column..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categoricalColumns.map((c) => (
+                            <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Completed Status Value</Label>
+                      <Input
+                        value={config.completedValue ?? 'Done'}
+                        onChange={(e) => setConfig({ ...config, completedValue: e.target.value })}
+                        placeholder="e.g. Done"
+                      />
+                    </div>
+                  </>
+                )}
               </>
             )}
 

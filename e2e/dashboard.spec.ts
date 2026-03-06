@@ -24,7 +24,7 @@ test.describe('Dashboard Builder', () => {
       // Should show column configuration
       await expect(page.getByText('Column Configuration')).toBeVisible()
       await expect(page.getByText('50 rows')).toBeVisible()
-      await expect(page.getByText('11 columns')).toBeVisible()
+      await expect(page.getByText('15 columns')).toBeVisible()
 
       // Should show the data preview
       await expect(page.getByText('Data Preview')).toBeVisible()

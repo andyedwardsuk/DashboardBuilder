@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Upload, Database, ArrowRight, Check, X, Sparkles } from 'lucide-react'
+import { Upload, Database, ArrowRight, Check, X, Sparkles, XCircle } from 'lucide-react'
 
 const COLUMN_TYPES: { value: ColumnType; label: string }[] = [
   { value: 'text', label: 'Text' },
@@ -118,6 +118,13 @@ export default function SetupPage() {
       if (c.name !== colName) return c
       return { ...c, options: (c.options ?? []).filter((o) => o !== option) }
     })
+    dispatch({ type: 'UPDATE_COLUMNS', payload: updated })
+  }
+
+  function handleRemoveAllOptions(colName: string) {
+    const updated = columns.map((c) =>
+      c.name === colName ? { ...c, options: [] } : c
+    )
     dispatch({ type: 'UPDATE_COLUMNS', payload: updated })
   }
 
@@ -326,18 +333,30 @@ export default function SetupPage() {
                             </Button>
                           </div>
                           {(col.options ?? []).length > 0 && (
-                            <div className="flex flex-wrap gap-1">
+                            <div className="flex flex-wrap gap-1 items-center">
                               {col.options!.map((opt) => (
                                 <Badge key={opt} variant="secondary" className="text-xs gap-1">
                                   {opt}
                                   <button
                                     onClick={() => handleRemoveOption(col.name, opt)}
                                     className="ml-0.5 hover:text-destructive"
+                                    aria-label={`Remove option ${opt}`}
                                   >
                                     <X className="h-3 w-3" />
                                   </button>
                                 </Badge>
                               ))}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 text-xs text-destructive hover:text-destructive"
+                                onClick={() => handleRemoveAllOptions(col.name)}
+                                aria-label={`Remove all options from ${col.name}`}
+                                data-testid={`remove-all-options-${col.name}`}
+                              >
+                                <XCircle className="mr-1 h-3 w-3" />
+                                Remove all
+                              </Button>
                             </div>
                           )}
                           {(col.options ?? []).length === 0 && (

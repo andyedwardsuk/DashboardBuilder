@@ -9,8 +9,12 @@ export const sampleColumns: ColumnConfig[] = [
   { name: 'Category', type: 'multi-select', isKey: false },
   { name: 'Start Date', type: 'date', isKey: false },
   { name: 'Due Date', type: 'date', isKey: false },
+  { name: 'Planned Completion', type: 'date', isKey: false },
+  { name: 'Actual Completion', type: 'date', isKey: false },
+  { name: 'Forecast Completion', type: 'date', isKey: false },
   { name: 'Estimated Hours', type: 'number', isKey: false },
   { name: 'Actual Hours', type: 'number', isKey: false },
+  { name: 'Rework Hours', type: 'number', isKey: false },
   { name: 'Description', type: 'free-text', isKey: false },
 ]
 
@@ -55,6 +59,26 @@ export function generateSampleData(): Record<string, unknown>[] {
       : status === 'In Progress' || status === 'In Review'
         ? Math.floor(estimated * (0.3 + Math.random() * 0.5))
         : 0
+    const rework = status === 'Done'
+      ? Math.floor(Math.random() * 8)
+      : status === 'In Review'
+        ? Math.floor(Math.random() * 4)
+        : 0
+
+    // Planned completion = due date
+    const plannedCompletion = dueDate
+    // Actual completion = set for Done items (a few days around due date)
+    const actualCompletion = status === 'Done'
+      ? new Date(new Date(dueDate).getTime() + (Math.floor(Math.random() * 14) - 5) * 86400000)
+          .toISOString().split('T')[0]
+      : ''
+    // Forecast completion = set for In Progress / In Review items
+    const forecastCompletion = status === 'In Progress' || status === 'In Review'
+      ? new Date(new Date(dueDate).getTime() + Math.floor(Math.random() * 21) * 86400000)
+          .toISOString().split('T')[0]
+      : status === 'Done'
+        ? actualCompletion
+        : ''
 
     rows.push({
       'ID': i,
@@ -65,8 +89,12 @@ export function generateSampleData(): Record<string, unknown>[] {
       'Category': pick(categories),
       'Start Date': startDate,
       'Due Date': dueDate,
+      'Planned Completion': plannedCompletion,
+      'Actual Completion': actualCompletion,
+      'Forecast Completion': forecastCompletion,
       'Estimated Hours': estimated,
       'Actual Hours': Math.max(0, actual),
+      'Rework Hours': rework,
       'Description': `Task #${i} - ${status === 'Done' ? 'Completed' : 'Ongoing'} work item.`,
     })
   }
